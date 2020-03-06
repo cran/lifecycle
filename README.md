@@ -24,10 +24,10 @@ remotes::install_github("r-lib/lifecycle")
 
 Use lifecycle to document the status of your exported functions and arguments:
 
-* Choose one of the 7 lifecycle stages a function or argument can be in. You can choose from 4 development stages (experimental, maturing, stable, and questining) and 3 deprecation stages (soft-deprecated, deprecated, and defunct).
+* Choose one of the 7 lifecycle stages a function or argument can be in. You can choose from 4 development stages (experimental, maturing, stable, and questioning) and 3 deprecation stages (soft-deprecated, deprecated, and defunct).
 
 * If the function or argument is deprecated, make sure your users know about by calling `deprecate_soft()`, `deprecate_warn()`, or `deprecate_stop()`. These functions try to be informative without being too verbose, with increasing levels of verbosity as the deprecation stage advances.
 
 * Include the relevant lifecycle badge in your documentation.
 
-Consult the usage vignette to learn about the workflow: `vignette("usage", package = "lifecycle")`.
+Consult the usage vignette to learn about the workflow: `vignette("lifecycle", package = "lifecycle")`.
