@@ -7,52 +7,49 @@
 badge(stage)
 }
 \arguments{
-\item{stage}{A lifecycle stage as a string, one of:
-\code{"experimental"}, \code{"maturing"}, \code{"stable"}, \code{"questioning"},
-\code{"archived"}, \code{"soft-deprecated"}, \code{"deprecated"}, \code{"defunct"}.}
+\item{stage}{A lifecycle stage as a string. Must be one of
+\code{"experimental"}, \code{"stable"}, \code{"superseded"}, or \code{"deprecated"}.
+
+Superseded stages \code{"questioning"}, \code{"maturing"}, \code{"soft-deprecated"},
+"\code{defunct}", and \code{"retired"} are supported for backwards compatibility.}
 }
 \value{
 An \code{Rd} expression describing the lifecycle stage.
 }
 \description{
-Call \code{usethis::use_lifecycle()} to import the badges in your
-package. Then use the \code{lifecycle} Rd macro to insert a lifecycle
-badges in your documentation, with the relevant lifecycle stage as
-argument:\preformatted{\\lifecycle\{experimental\}
-\\lifecycle\{soft-deprecated\}
+To include lifecycle badges in your documentation:
+\enumerate{
+\item Call \code{usethis::use_lifecycle()} to copy the badge images into the
+\verb{man/} folder of your package.
+\item Call \code{lifecycle::badge()} inside R backticks to insert a
+lifecycle badge:\preformatted{#' `r lifecycle::badge("experimental")`
+#' `r lifecycle::badge("deprecated")`
+#' `r lifecycle::badge("superseded")`
 }
-
-The badge is displayed as image in the HTML version of the
-documentation and as text otherwise.
 
 If the deprecated feature is a function, a good place for this
-badge is at the top of the topic description (if the deprecated
-function is documented with other functions, it might be a good
-idea to extract it in its own documentation topic to prevent
-confusion). If it is an argument, you can put the badge in the
-argument description.
-}
-\details{
-The \verb{lifecycle\{\}} macro is made available by adding this field to
-DESCRIPTION (this is done automatically by
-\code{usethis::use_lifecycle()}):\preformatted{RdMacros: lifecycle
+badge is at the top of the topic description. If it is an argument,
+you can put the badge in the argument description.
 }
 
-The macro expands to this expression:\preformatted{\\Sexpr[results=rd, stage=render]\{lifecycle::badge("experimental")\}
-}
+The badge is displayed as an image in the HTML version of the
+documentation and as text otherwise.
+
+\code{lifecycle::badge()} is run by roxygen at build time so you don't need
+to add lifecycle to \verb{Imports:} just to use the badges. However, it's still
+good practice to add to \verb{Suggests:} so that it will be available to
+package developers.
 }
 \section{Badges}{
 
 \itemize{
-\item \verb{\lifecycle{experimental}}: \lifecycle{experimental}
-\item \verb{\lifecycle{maturing}}: \lifecycle{maturing}
-\item \verb{\lifecycle{stable}}: \lifecycle{stable}
-\item \verb{\lifecycle{questioning}}: \lifecycle{questioning}
-\item \verb{\lifecycle{superseded}}: \lifecycle{superseded}
-\item \verb{\lifecycle{archived}}: \lifecycle{archived}
-\item \verb{\lifecycle{soft-deprecated}}: \lifecycle{soft-deprecated}
-\item \verb{\lifecycle{deprecated}}: \lifecycle{deprecated}
-\item \verb{\lifecycle{defunct}}: \lifecycle{defunct}
+\item \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}} \code{lifecycle::badge("experimental")}
+\item \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#stable}{\figure{lifecycle-stable.svg}{options: alt='[Stable]'}}}{\strong{[Stable]}} \code{lifecycle::badge("stable")}
+\item \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#superseded}{\figure{lifecycle-superseded.svg}{options: alt='[Superseded]'}}}{\strong{[Superseded]}} \code{lifecycle::badge("superseded")}
+\item \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} \code{lifecycle::badge("deprecated")}
 }
+
+The meaning of these stages is described in
+\code{vignette("stages")}.
 }
 

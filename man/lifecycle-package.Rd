@@ -6,15 +6,9 @@
 \alias{lifecycle-package}
 \title{lifecycle: Manage the Life Cycle of your Package Functions}
 \description{
-Manage the life cycle of your exported functions with
-    shared conventions, documentation badges, and non-invasive
-    deprecation warnings. The 'lifecycle' package defines four
-    development stages (experimental, maturing, stable, and
-    questioning) and three deprecation stages (soft-deprecated,
-    deprecated, and defunct). It makes it easy to insert badges
-    corresponding to these stages in your documentation. Usage of
-    deprecated functions are signalled with increasing levels of
-    non-invasive verbosity.
+Manage the life cycle of your exported functions
+    with shared conventions, documentation badges, and user-friendly
+    deprecation warnings.
 }
 \seealso{
 Useful links:
@@ -27,6 +21,11 @@ Useful links:
 }
 \author{
 \strong{Maintainer}: Lionel Henry \email{lionel@rstudio.com}
+
+Authors:
+\itemize{
+  \item Hadley Wickham \email{hadley@rstudio.com} (\href{https://orcid.org/0000-0003-4757-117X}{ORCID})
+}
 
 Other contributors:
 \itemize{
