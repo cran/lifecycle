@@ -100,7 +100,8 @@ deprecate_soft <- function(when,
   verbosity <- lifecycle_verbosity()
   if (verbosity == "quiet") {
     NULL
-  } else if (verbosity %in% "warning" || env_inherits_global(user_env)) {
+  } else if (verbosity %in% "warning" ||
+             (is_string(verbosity, "default") && env_inherits_global(user_env))) {
     trace <- trace_back(bottom = caller_env())
     deprecate_warn0(msg, trace)
   } else if (verbosity == "error") {
@@ -141,7 +142,7 @@ deprecate_warn <- function(when,
 
       footer <- paste_line(
         silver("This warning is displayed once every 8 hours."),
-        silver("Call `lifecycle::last_warnings()` to see where this warning was generated.")
+        silver("Call `lifecycle::last_lifecycle_warnings()` to see where this warning was generated.")
       )
 
       trace <- trace_back(bottom = caller_env())
