@@ -26,9 +26,11 @@
 #'   * Deprecate an argument with `"foo(arg)"`.
 #'   * Partially deprecate an argument with
 #'     `"foo(arg = 'must be a scalar integer')"`.
+#'   * Deprecate anything else with a custom message by wrapping it in `I()`.
 #'
 #'   You can optionally supply the namespace: `"ns::foo()"`, but this is
 #'   usually not needed as it will be inferred from the caller environment.
+#'
 #' @param with An optional string giving a recommended replacement for the
 #'   deprecated behaviour. This takes the same form as `what`.
 #' @param details In most cases the deprecation message can be automatically
@@ -94,7 +96,7 @@ deprecate_soft <- function(when,
                            env = caller_env(),
                            user_env = caller_env(2)) {
   msg <- NULL # trick R CMD check
-  msg %<~~% lifecycle_message(when, what, with, details, env, "deprecate_soft")
+  msg %<~% lifecycle_message(when, what, with, details, env, "deprecate_soft")
   signal_stage("deprecated", what)
 
   verbosity <- lifecycle_verbosity()
@@ -103,7 +105,7 @@ deprecate_soft <- function(when,
   } else if (verbosity %in% "warning" ||
              (is_string(verbosity, "default") && env_inherits_global(user_env))) {
     trace <- trace_back(bottom = caller_env())
-    deprecate_warn0(msg, trace)
+    deprecate_warn0(msg, trace, always = TRUE)
   } else if (verbosity == "error") {
     deprecate_stop0(msg)
   } else {
@@ -114,15 +116,19 @@ deprecate_soft <- function(when,
 }
 
 #' @rdname deprecate_soft
+#' @param always If `FALSE`, the default, will warn every 8 hours.
+#'   If `TRUE`, will always warn. Only use `always = TRUE` after at least
+#'   one release with the default.
 #' @export
 deprecate_warn <- function(when,
                            what,
                            with = NULL,
                            details = NULL,
                            id = NULL,
+                           always = FALSE,
                            env = caller_env()) {
   msg <- NULL # trick R CMD check
-  msg %<~~% lifecycle_message(when, what, with, details, env, "deprecate_warn")
+  msg %<~% lifecycle_message(when, what, with, details, env, "deprecate_warn")
   signal_stage("deprecated", what)
 
   verbosity <- lifecycle_verbosity()
@@ -130,23 +136,18 @@ deprecate_warn <- function(when,
     NULL
   } else if (verbosity == "warning") {
     trace <- trace_back(bottom = caller_env())
-    deprecate_warn0(msg, trace)
+    deprecate_warn0(msg, trace, always = TRUE)
   } else if (verbosity == "error") {
     deprecate_stop0(msg)
   } else {
     id <- id %||% msg
 
-    if (needs_warning(id)) {
+    if (always || needs_warning(id)) {
       # Prevent warning from being displayed again
       env_poke(deprecation_env, id, Sys.time())
 
-      footer <- paste_line(
-        silver("This warning is displayed once every 8 hours."),
-        silver("Call `lifecycle::last_lifecycle_warnings()` to see where this warning was generated.")
-      )
-
       trace <- trace_back(bottom = caller_env())
-      deprecate_warn0(msg, trace, footer)
+      deprecate_warn0(msg, trace, always = always)
     }
   }
 
@@ -161,7 +162,7 @@ deprecate_stop <- function(when,
                            details = NULL,
                            env = caller_env()) {
   msg <- NULL # trick R CMD check
-  msg %<~~% lifecycle_message(when, what, with, details, env, "deprecate_stop")
+  msg %<~% lifecycle_message(when, what, with, details, env, "deprecate_stop")
   signal_stage("deprecated", what)
   deprecate_stop0(msg)
 }
@@ -172,7 +173,15 @@ deprecate_soft0 <- function(msg) {
   signal(msg, "lifecycle_soft_deprecated")
 }
 
-deprecate_warn0 <- function(msg, trace = NULL, footer = NULL) {
+deprecate_warn0 <- function(msg, trace = NULL, always = FALSE) {
+  footer <- function(...) {
+    if (is_interactive()) {
+      c(
+        if (!always) silver("This warning is displayed once every 8 hours."),
+        silver("Call `lifecycle::last_lifecycle_warnings()` to see where this warning was generated.")
+      )
+    }
+  }
   wrn <- new_deprecated_warning(msg, trace, footer = footer)
 
   # Record muffled warnings if testthat is running because it
@@ -235,7 +244,9 @@ lifecycle_message <- function(when,
 lifecycle_message_what <- function(what, when) {
   glue_what <- function(x) glue::glue_data(what, x)
 
-  what$fn <- fun_label(what$fn)
+  if (!inherits(what$fn, "AsIs")) {
+    what$fn <- fun_label(what$fn)
+  }
 
   if (is_null(what$arg)) {
     if (what$from == "deprecate_stop") {
@@ -257,23 +268,27 @@ fun_label <- function(fn) {
   if (grepl("^`", fn)) {
     fn
   } else {
-    paste0("`", fn , "()`")
+    paste0("`", fn, "()`")
   }
 }
 
 lifecycle_message_with <- function(with, what) {
   glue_with <- function(x) glue::glue_data(with, x)
 
-  if (!is_null(with$pkg) && what$pkg != with$pkg) {
-    with$fn <- glue_with("{ pkg }::{ fn }")
-  }
-
-  if (is_null(with$arg)) {
-    glue_with("Please use `{ fn }()` instead.")
-  } else if (what$fn == with$fn) {
-    glue_with("Please use the `{ arg }` argument instead.")
+  if (inherits(with$fn, "AsIs")) {
+    glue_with("Please use { fn } instead.")
   } else {
-    glue_with("Please use the `{ arg }` argument of `{ fn }()` instead.")
+    if (!is_null(with$pkg) && what$pkg != with$pkg) {
+      with$fn <- glue_with("{ pkg }::{ fn }")
+    }
+
+    if (is_null(with$arg)) {
+      glue_with("Please use `{ fn }()` instead.")
+    } else if (what$fn == with$fn) {
+      glue_with("Please use the `{ arg }` argument instead.")
+    } else {
+      glue_with("Please use the `{ arg }` argument of `{ fn }()` instead.")
+    }
   }
 }
 

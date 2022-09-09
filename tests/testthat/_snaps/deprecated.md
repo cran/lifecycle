@@ -1,3 +1,26 @@
+# deprecate_warn() only warns repeatedly if always = TRUE
+
+    Code
+      deprecate()
+    Condition
+      Warning:
+      `foo()` was deprecated in lifecycle 1.0.0.
+    Code
+      deprecate()
+
+---
+
+    Code
+      deprecate(always = TRUE)
+    Condition
+      Warning:
+      `foo()` was deprecated in lifecycle 1.0.0.
+    Code
+      deprecate(always = TRUE)
+    Condition
+      Warning:
+      `foo()` was deprecated in lifecycle 1.0.0.
+
 # what deprecation messages are readable
 
     Code
@@ -16,6 +39,14 @@
       cat_line(lifecycle_message("1.0.0", "foo(arg)", signaller = "deprecate_stop"))
     Output
       The `arg` argument of `foo()` was deprecated in base 1.0.0 and is now defunct.
+    Code
+      cat_line(lifecycle_message("1.0.0", I("Use of bananas")))
+    Output
+      Use of bananas was deprecated in base 1.0.0.
+    Code
+      cat_line(lifecycle_message("1.0.0", I("Use of bananas"), signaller = "deprecate_stop"))
+    Output
+      Use of bananas was deprecated in base 1.0.0 and is now defunct.
 
 # replace deprecation messages are readable
 
@@ -39,6 +70,11 @@
     Output
       The `arg` argument of `foo()` is deprecated as of base 1.0.0.
       Please use the `arg` argument of `bar()` instead.
+    Code
+      cat_line(lifecycle_message("1.0.0", I("Use of bananas"), I("apples")))
+    Output
+      Use of bananas was deprecated in base 1.0.0.
+      Please use apples instead.
 
 # unusual names are handled gracefully
 
@@ -62,7 +98,7 @@
         x = "Error"), signaller = "deprecate_stop"))
     Output
       `foo()` was deprecated in base 1.0.0 and is now defunct.
-      * Unnamed
+      Unnamed
       i Informative
       x Error
 
@@ -70,22 +106,25 @@
 
     Code
       lifecycle_message(1)
-    Error <rlang_error>
-      Internal error in lifecycle: `when` must be a string
+    Condition
+      Error in `lifecycle_abort()`:
+      ! Internal error in lifecycle: `when` must be a string
 
 ---
 
     Code
       lifecycle_message("1", details = 1)
-    Error <rlang_error>
-      Internal error in lifecycle: `details` must be a character vector
+    Condition
+      Error in `lifecycle_abort()`:
+      ! Internal error in lifecycle: `details` must be a character vector
 
 # needs_warning works as expected
 
     Code
       needs_warning(1)
-    Error <rlang_error>
-      Internal error in lifecycle: `id` must be a string
+    Condition
+      Error in `lifecycle_abort()`:
+      ! Internal error in lifecycle: `id` must be a string
 
 ---
 

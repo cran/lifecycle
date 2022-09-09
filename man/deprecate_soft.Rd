@@ -22,6 +22,7 @@ deprecate_warn(
   with = NULL,
   details = NULL,
   id = NULL,
+  always = FALSE,
   env = caller_env()
 )
 
@@ -36,6 +37,7 @@ deprecate_stop(when, what, with = NULL, details = NULL, env = caller_env())
 \item Deprecate an argument with \code{"foo(arg)"}.
 \item Partially deprecate an argument with
 \code{"foo(arg = 'must be a scalar integer')"}.
+\item Deprecate anything else with a custom message by wrapping it in \code{I()}.
 }
 
 You can optionally supply the namespace: \code{"ns::foo()"}, but this is
@@ -63,6 +65,10 @@ called the deprecating function was called (used to determine if
 These are only needed if you're calling \verb{deprecate_*()} from an internal
 helper, in which case you should forward \code{env = caller_env()} and
 \code{user_env = caller_env(2)}.}
+
+\item{always}{If \code{FALSE}, the default, will warn every 8 hours.
+If \code{TRUE}, will always warn. Only use \code{always = TRUE} after at least
+one release with the default.}
 }
 \value{
 \code{NULL}, invisibly.
