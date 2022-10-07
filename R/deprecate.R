@@ -4,9 +4,11 @@
 #' These functions provide three levels of verbosity for deprecated
 #' functions. Learn how to use them in `vignette("communicate")`.
 #'
-#' * `deprecate_soft()` warns only if the deprecated function is
-#'   called from the global environment or from the package currently
-#'   being tested.
+#' * `deprecate_soft()` warns only if the deprecated function is called
+#'   directly, i.e. a user is calling a function they wrote in the global
+#'   environment or a developer is calling it in their package. It does not
+#'   warn when called indirectly, i.e. the deprecation comes from code that
+#'   you don't control.
 #'
 #' * `deprecate_warn()` warns unconditionally.
 #'
@@ -33,10 +35,14 @@
 #'
 #' @param with An optional string giving a recommended replacement for the
 #'   deprecated behaviour. This takes the same form as `what`.
-#' @param details In most cases the deprecation message can be automatically
-#'   generated from `with`. When it can't, use `details` to provide a
-#'   hand-written message. `details` can either be a single string or a
-#'   character vector, which will be converted to a bulleted list.
+#' @param details In most cases the deprecation message can be
+#'   automatically generated from `with`. When it can't, use `details`
+#'   to provide a hand-written message.
+#'
+#'   `details` can either be a single string or a character vector,
+#'   which will be converted to a [bulleted list][cli::cli_bullets].
+#'   By default, info bullets are used. Provide a named vectors to
+#'   override.
 #' @param id The id of the deprecation. A warning is issued only once
 #'   for each `id`. Defaults to the generated message, but you should
 #'   give a unique ID when the message in `details` is built
@@ -96,29 +102,39 @@ deprecate_soft <- function(when,
                            env = caller_env(),
                            user_env = caller_env(2)) {
   msg <- NULL # trick R CMD check
-  msg %<~% lifecycle_message(when, what, with, details, env, "deprecate_soft")
+  msg %<~% lifecycle_message(when, what, with, details, env, signaller = "deprecate_soft")
   signal_stage("deprecated", what)
 
   verbosity <- lifecycle_verbosity()
-  if (verbosity == "quiet") {
-    NULL
-  } else if (verbosity %in% "warning" ||
-             (is_string(verbosity, "default") && env_inherits_global(user_env))) {
-    trace <- trace_back(bottom = caller_env())
-    deprecate_warn0(msg, trace, always = TRUE)
-  } else if (verbosity == "error") {
-    deprecate_stop0(msg)
-  } else {
-    deprecate_soft0(msg)
-  }
+  direct <- is_direct(user_env)
 
-  invisible(NULL)
+  invisible(switch(
+    verbosity,
+    quiet = NULL,
+    warning = ,
+    default =
+      if (direct) {
+        always <- verbosity == "warning"
+        trace <- trace_back(bottom = caller_env())
+        deprecate_warn0(
+          msg,
+          id,
+          trace,
+          always = always,
+          direct = TRUE,
+          user_env = user_env
+        )
+      },
+    error = deprecate_stop0(msg)
+  ))
 }
 
 #' @rdname deprecate_soft
-#' @param always If `FALSE`, the default, will warn every 8 hours.
-#'   If `TRUE`, will always warn. Only use `always = TRUE` after at least
-#'   one release with the default.
+#' @param always If `FALSE`, the default, will warn every 8 hours.  If
+#'   `TRUE`, will always warn in direct usages. Indirect usages keep
+#'   warning every 8 hours to avoid disrupting users who can't fix the
+#'   issue. Only use `always = TRUE` after at least one release with
+#'   the default.
 #' @export
 deprecate_warn <- function(when,
                            what,
@@ -126,32 +142,33 @@ deprecate_warn <- function(when,
                            details = NULL,
                            id = NULL,
                            always = FALSE,
-                           env = caller_env()) {
+                           env = caller_env(),
+                           user_env = caller_env(2)) {
   msg <- NULL # trick R CMD check
-  msg %<~% lifecycle_message(when, what, with, details, env, "deprecate_warn")
+  msg %<~% lifecycle_message(when, what, with, details, env, signaller = "deprecate_warn")
   signal_stage("deprecated", what)
 
   verbosity <- lifecycle_verbosity()
-  if (verbosity == "quiet") {
-    NULL
-  } else if (verbosity == "warning") {
-    trace <- trace_back(bottom = caller_env())
-    deprecate_warn0(msg, trace, always = TRUE)
-  } else if (verbosity == "error") {
-    deprecate_stop0(msg)
-  } else {
-    id <- id %||% msg
 
-    if (always || needs_warning(id)) {
-      # Prevent warning from being displayed again
-      env_poke(deprecation_env, id, Sys.time())
-
+  invisible(switch(
+    verbosity,
+    quiet = NULL,
+    warning = ,
+    default = {
+      direct <- is_direct(user_env)
+      always <- direct && (always || verbosity == "warning")
       trace <- trace_back(bottom = caller_env())
-      deprecate_warn0(msg, trace, always = always)
-    }
-  }
-
-  invisible(NULL)
+      deprecate_warn0(
+        msg,
+        id,
+        trace,
+        always = always,
+        direct = direct,
+        user_env = user_env
+      )
+    },
+    error = deprecate_stop0(msg),
+  ))
 }
 
 #' @rdname deprecate_soft
@@ -162,25 +179,68 @@ deprecate_stop <- function(when,
                            details = NULL,
                            env = caller_env()) {
   msg <- NULL # trick R CMD check
-  msg %<~% lifecycle_message(when, what, with, details, env, "deprecate_stop")
+  msg %<~% lifecycle_message(when, what, with, details, env, signaller =  "deprecate_stop")
   signal_stage("deprecated", what)
   deprecate_stop0(msg)
 }
 
 # Signals -----------------------------------------------------------------
 
-deprecate_soft0 <- function(msg) {
-  signal(msg, "lifecycle_soft_deprecated")
-}
+deprecate_warn0 <- function(msg,
+                            id = NULL,
+                            trace = NULL,
+                            always = FALSE,
+                            direct = FALSE,
+                            call = caller_env(),
+                            user_env = caller_env(2)) {
+  id <- id %||% paste_line(msg)
+  if (!always && !needs_warning(id, call = call)) {
+    return()
+  }
 
-deprecate_warn0 <- function(msg, trace = NULL, always = FALSE) {
+  # Prevent warning from being displayed again
+  env_poke(deprecation_env, id, Sys.time())
+
   footer <- function(...) {
+    footer <- NULL
+
+    if (!direct) {
+      top <- topenv(user_env)
+
+      if (is_namespace(top)) {
+        pkg <- ns_env_name(top)
+        url <- pkg_url_bug(pkg)
+
+        likely_line <- cli::format_inline(
+          "The deprecated feature was likely used in the {.pkg {pkg}} package."
+        )
+
+        if (is_null(url)) {
+          report_line <-
+            "Please report the issue to the authors."
+        } else {
+          report_line <- cli::format_inline(
+            "Please report the issue at {.url {url}}."
+          )
+        }
+
+        footer <- c(
+          footer,
+          "i" = likely_line,
+          " " = report_line
+        )
+      }
+    }
+
     if (is_interactive()) {
-      c(
+      footer <- c(
+        footer,
         if (!always) silver("This warning is displayed once every 8 hours."),
         silver("Call `lifecycle::last_lifecycle_warnings()` to see where this warning was generated.")
       )
     }
+
+    footer
   }
   wrn <- new_deprecated_warning(msg, trace, footer = footer)
 
@@ -201,8 +261,8 @@ deprecate_warn0 <- function(msg, trace = NULL, always = FALSE) {
 }
 
 deprecate_stop0 <- function(msg) {
-  stop(cnd(
-    c("lifecycle_error_deprecated", "defunctError", "error", "condition"),
+  cnd_signal(error_cnd(
+    c("lifecycle_error_deprecated", "defunctError"),
     old = NULL,
     new = NULL,
     package = NULL,
@@ -217,28 +277,29 @@ lifecycle_message <- function(when,
                               with = NULL,
                               details = NULL,
                               env = caller_env(2),
+                              call = caller_env(),
                               signaller = "signal_lifecycle") {
-  if (!is_string(when)) {
-    lifecycle_abort("`when` must be a string")
+  check_string(when, call = call)
+
+  if (is_null(details)) {
+    details <- chr()
+  } else {
+    check_character(details, call = call)
   }
 
-  details <- details %||% chr()
-  if (!is.character(details)) {
-    lifecycle_abort("`details` must be a character vector")
-  }
-  if (length(details) > 1) {
-    details <- format_error_bullets(details)
-  }
-
-  what <- spec(what, env, signaller)
+  what <- spec(what, env, signaller = signaller)
   msg <- lifecycle_message_what(what, when)
 
   if (!is_null(with)) {
-    with <- spec(with, NULL, signaller)
-    msg <- paste0(msg, "\n", lifecycle_message_with(with, what))
+    with <- spec(with, NULL, signaller = signaller)
+    msg <- c(msg, "i" = lifecycle_message_with(with, what))
   }
 
-  paste_line(msg, details)
+  if (is_null(names(details))) {
+    details <- set_names(details, "i")
+  }
+
+  c(msg, details)
 }
 
 lifecycle_message_what <- function(what, when) {
@@ -294,6 +355,10 @@ lifecycle_message_with <- function(with, what) {
 
 # Helpers -----------------------------------------------------------------
 
+is_direct <- function(env) {
+  env_inherits_global(env) || from_testthat(env)
+}
+
 env_inherits_global <- function(env) {
   # `topenv(emptyenv())` returns the global env. Return `FALSE` in
   # that case to allow passing the empty env when the
@@ -306,10 +371,26 @@ env_inherits_global <- function(env) {
   is_reference(topenv(env), global_env())
 }
 
-needs_warning <- function(id) {
-  if (!is_string(id)) {
-    lifecycle_abort("`id` must be a string")
+# TRUE if we are in unit tests and the package being tested is the
+# same as the package that called
+from_testthat <- function(env) {
+  tested_package <- Sys.getenv("TESTTHAT_PKG")
+  if (!nzchar(tested_package)) {
+    return(FALSE)
   }
+
+  top <- topenv(env)
+  if (!is_namespace(top)) {
+    return(FALSE)
+  }
+
+  # Test for environment names rather than reference/contents because
+  # testthat clones the namespace
+  identical(ns_env_name(top), tested_package)
+}
+
+needs_warning <- function(id, call = caller_env()) {
+  check_string(id, call = call)
 
   last <- deprecation_env[[id]]
   if (is_null(last)) {
@@ -317,7 +398,10 @@ needs_warning <- function(id) {
   }
 
   if (!inherits(last, "POSIXct")) {
-    lifecycle_abort("Expected `POSIXct` value in `needs_warning()`.")
+    abort(
+      "Expected `POSIXct` value in `needs_warning()`.",
+      .internal = TRUE
+    )
   }
 
   # Warn every 8 hours

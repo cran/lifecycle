@@ -27,7 +27,17 @@ italic    <- function(x) if (has_crayon()) crayon::italic(x)    else x
 underline <- function(x) if (has_crayon()) crayon::underline(x) else x
 # nocov end
 
-lifecycle_abort <- function(x, env = parent.frame()) {
-  x <- paste0("Internal error in lifecycle: ", glue::trim(x))
-  abort(glue::glue(x, .envir = env))
+pkg_url_bug <- function(pkg) {
+  # First check that package is installed, e.g. in case of
+  # runtime-only namespace created by pkgload
+  if (nzchar(system.file(package = pkg))) {
+    url <- utils::packageDescription(pkg)$BugReports
+
+    # `url` can be NULL if not part of the description
+    if (is_string(url) && grepl("^https://", url)) {
+      return(url)
+    }
+  }
+
+  NULL
 }
