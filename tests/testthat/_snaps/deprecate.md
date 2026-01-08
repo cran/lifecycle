@@ -176,7 +176,7 @@
       lifecycle_message(1)
     Condition
       Error:
-      ! `when` must be a single string, not a number.
+      ! `when` must be a single string, not the number 1.
 
 ---
 
@@ -184,7 +184,19 @@
       lifecycle_message("1", details = 1)
     Condition
       Error:
-      ! `details` must be a character vector, not a number.
+      ! `details` must be a character vector, not the number 1.
+
+# lifecycle message is never generated when an `id` is supplied and we've already warned
+
+    Code
+      deprecate_soft(when = stop("when"), what = stop("what"), with = stop("with"),
+      details = stop("details"), env = stop("env"), id = "test")
+
+---
+
+    Code
+      deprecate_warn(when = stop("when"), what = stop("what"), with = stop("with"),
+      details = stop("details"), env = stop("env"), id = "test")
 
 # needs_warning works as expected
 
@@ -192,11 +204,5 @@
       needs_warning(1)
     Condition
       Error:
-      ! `id` must be a single string, not a number.
-
----
-
-    Expected `POSIXct` value in `needs_warning()`.
-    i This is an internal error that was detected in the lifecycle package.
-      Please report it at <https://github.com/r-lib/lifecycle/issues> with a reprex (<https://tidyverse.org/help/>) and the full backtrace.
+      ! `id` must be a single string, not the number 1.
 
